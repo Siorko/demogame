@@ -1,6 +1,7 @@
-import { Star, Cpu, Rocket, Gem, Coins, Pickaxe } from 'lucide-react';
+import { Star, Cpu, Rocket, Gem, Coins, Pickaxe, Activity } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { STAR_CONFIGS } from '../types/game';
+import Dashboard from '../components/Dashboard';
 
 export default function HomePage() {
   const { player, stars, ais, ships, resources, collectResources } = useGameStore();
@@ -27,96 +28,33 @@ export default function HomePage() {
       </div>
 
       <div className="relative z-10 p-6">
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] bg-clip-text text-transparent mb-2">
             星际矿业主
           </h1>
           <p className="text-gray-400">探索宇宙，开采无限资源</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-[#16213e] to-[#0f3460] rounded-2xl p-4 border border-[#4ECDC4]/20 hover:border-[#4ECDC4]/50 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#4ECDC4]/20 rounded-xl">
-                <Star className="text-[#4ECDC4]" size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">恒星数量</p>
-                <p className="text-white font-bold text-xl">{stars.length}</p>
-              </div>
-            </div>
-            <div className="mt-2 flex gap-2 text-xs">
-              <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full">{activeStars.length} 活跃</span>
-              <span className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded-full">{depletedStars.length} 枯竭</span>
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full">{dormantStars.length} 休眠</span>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#16213e] to-[#0f3460] rounded-2xl p-4 border border-[#FF6B6B]/20 hover:border-[#FF6B6B]/50 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#FF6B6B]/20 rounded-xl">
-                <Cpu className="text-[#FF6B6B]" size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">AI矿工</p>
-                <p className="text-white font-bold text-xl">{ais.length}</p>
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {ais.slice(0, 3).map(ai => (
-                <span key={ai.id} className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full text-xs">
-                  T{ai.tier}
-                </span>
-              ))}
-              {ais.length > 3 && (
-                <span className="px-2 py-0.5 bg-gray-500/20 text-gray-400 rounded-full text-xs">
-                  +{ais.length - 3}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#16213e] to-[#0f3460] rounded-2xl p-4 border border-[#FFE66D]/20 hover:border-[#FFE66D]/50 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#FFE66D]/20 rounded-xl">
-                <Rocket className="text-[#FFE66D]" size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">飞船</p>
-                <p className="text-white font-bold text-xl">{ships.length}</p>
-              </div>
-            </div>
-            <div className="mt-2">
-              <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs">
-                总槽位: {ships.reduce((sum, s) => sum + s.aiSlots, 0)}
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-[#16213e] to-[#0f3460] rounded-2xl p-4 border border-[#9B59B6]/20 hover:border-[#9B59B6]/50 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#9B59B6]/20 rounded-xl">
-                <Gem className="text-[#9B59B6]" size={24} />
-              </div>
-              <div>
-                <p className="text-gray-400 text-xs">资源总值</p>
-                <p className="text-white font-bold text-xl">
-                  {Object.values(resources).reduce((sum, val) => sum + val, 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
+        <div className="bg-gradient-to-br from-[#4ECDC4]/10 to-[#45B7AA]/5 rounded-2xl p-2 mb-6 border border-[#4ECDC4]/20">
+          <div className="flex items-center gap-2 px-4 py-2">
+            <Activity className="text-[#4ECDC4]" size={18} />
+            <span className="text-[#4ECDC4] text-sm">主运行台</span>
           </div>
         </div>
 
-        <button
-          onClick={collectResources}
-          className="w-full bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-white font-bold py-4 rounded-2xl shadow-lg shadow-[#4ECDC4]/30 hover:shadow-[#4ECDC4]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 mb-6"
-        >
-          <Pickaxe size={24} />
-          <span>收集资源</span>
-        </button>
+        <Dashboard />
 
-        <h2 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+        <div className="mt-6">
+          <button
+            onClick={collectResources}
+            className="w-full bg-gradient-to-r from-[#4ECDC4] to-[#45B7AA] text-white font-bold py-4 rounded-2xl shadow-lg shadow-[#4ECDC4]/30 hover:shadow-[#4ECDC4]/50 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <Pickaxe size={24} />
+            <span>收集资源</span>
+          </button>
+        </div>
+
+        <h2 className="text-white font-bold text-lg mt-8 mb-4 flex items-center gap-2">
           <Star className="text-[#4ECDC4]" size={20} />
           我的恒星
         </h2>

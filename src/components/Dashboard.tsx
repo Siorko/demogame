@@ -36,14 +36,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-[#4ECDC4]/20 to-[#45B7AA]/10 rounded-2xl p-4 border border-[#4ECDC4]/30">
+      <div className="glass-card p-4 border-gradient-animated">
         <div className="flex items-center gap-2 mb-4">
           <Activity className="text-[#4ECDC4]" size={20} />
           <h3 className="text-white font-bold">运行状态</h3>
         </div>
         
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[#16213e]/50 rounded-xl p-3">
+          <div className="stat-card card-hover-lift">
             <div className="flex items-center gap-2 mb-1">
               <Star className="text-yellow-400" size={16} />
               <span className="text-gray-400 text-xs">活跃恒星</span>
@@ -51,7 +51,7 @@ export default function Dashboard() {
             <p className="text-white font-bold text-xl">{activeStars.length} / {stars.length}</p>
           </div>
           
-          <div className="bg-[#16213e]/50 rounded-xl p-3">
+          <div className="stat-card card-hover-lift">
             <div className="flex items-center gap-2 mb-1">
               <Cpu className="text-purple-400" size={16} />
               <span className="text-gray-400 text-xs">AI矿工</span>
@@ -59,7 +59,7 @@ export default function Dashboard() {
             <p className="text-white font-bold text-xl">{assignedAIs.length} / {ais.length} 工作中</p>
           </div>
           
-          <div className="bg-[#16213e]/50 rounded-xl p-3">
+          <div className="stat-card card-hover-lift">
             <div className="flex items-center gap-2 mb-1">
               <Rocket className="text-blue-400" size={16} />
               <span className="text-gray-400 text-xs">飞船舰队</span>
@@ -67,7 +67,7 @@ export default function Dashboard() {
             <p className="text-white font-bold text-xl">{ships.length} 艘</p>
           </div>
           
-          <div className="bg-[#16213e]/50 rounded-xl p-3">
+          <div className="stat-card card-hover-lift">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="text-yellow-400" size={16} />
               <span className="text-gray-400 text-xs">科技加成</span>
@@ -78,7 +78,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-xl p-4 border border-green-500/30">
+        <div className="glass-card p-4 border-green-500/30 card-hover-lift">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="text-green-400" size={18} />
             <span className="text-gray-400 text-sm">日产出</span>
@@ -87,7 +87,7 @@ export default function Dashboard() {
           <p className="text-gray-400 text-xs mt-1">资源/天</p>
         </div>
         
-        <div className="bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-xl p-4 border border-red-500/30">
+        <div className="glass-card p-4 border-red-500/30 card-hover-lift">
           <div className="flex items-center gap-2 mb-2">
             <TrendingDown className="text-red-400" size={18} />
             <span className="text-gray-400 text-sm">日维护费</span>
@@ -97,11 +97,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className={`rounded-xl p-4 border ${
-        dailyNet >= 0 
-          ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500/30'
-          : 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-red-500/30'
-      }`}>
+      <div className={`glass-card p-4 ${dailyNet >= 0 ? 'border-blue-500/30' : 'border-red-500/30'} card-hover-lift`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className={dailyNet >= 0 ? 'text-blue-400' : 'text-red-400'} size={20} />
@@ -113,7 +109,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-[#16213e]/50 rounded-xl p-4 border border-[#0f3460]">
+      <div className="glass-card p-4 card-hover-lift">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-white font-medium">资源库存</h3>
           <span className="text-gray-400 text-sm">{Math.floor(resourceTotal).toLocaleString()} 总资源</span>
@@ -122,7 +118,7 @@ export default function Dashboard() {
         <div className="space-y-2">
           {topResources.length > 0 ? (
             topResources.map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between">
+              <div key={key} className="flex items-center justify-between py-2 border-b border-[#4ECDC4]/10 last:border-0">
                 <span className="text-gray-400 text-sm">{resourceNames[key]}</span>
                 <span className="text-white font-mono text-sm">{Math.floor(value).toLocaleString()}</span>
               </div>
@@ -133,26 +129,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-[#16213e]/50 rounded-xl p-4 border border-[#0f3460]">
+      <div className="glass-card p-4 card-hover-lift">
         <div className="flex items-center gap-2 mb-3">
           <Clock className="text-gray-400" size={18} />
           <h3 className="text-white font-medium">恒星状态</h3>
         </div>
         
-        <div className="space-y-2">
-          {stars.slice(0, 5).map(star => {
+        <div className="space-y-3">
+          {stars.slice(0, 5).map((star, index) => {
             const config = STAR_CONFIGS[star.type];
             const progress = (star.remainingResources / star.totalResources) * 100;
             
             return (
-              <div key={star.id} className="flex items-center gap-3">
-                <span className="text-xl">{config.icon}</span>
+              <div key={star.id} className="flex items-center gap-3 animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
+                <span className="text-xl animate-star-twinkle" style={{ animationDelay: `${index * 0.3}s` }}>{config.icon}</span>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-white text-sm">{star.name}</span>
-                    <span className={`text-xs ${
-                      star.status === 'active' ? 'text-green-400' :
-                      star.status === 'depleted' ? 'text-gray-400' : 'text-blue-400'
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      star.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                      star.status === 'depleted' ? 'bg-gray-500/20 text-gray-400' : 'bg-blue-500/20 text-blue-400'
                     }`}>
                       {star.status === 'active' ? '活跃' : star.status === 'depleted' ? '枯竭' : '休眠'}
                     </span>
@@ -162,7 +158,7 @@ export default function Dashboard() {
                       className="h-full rounded-full transition-all duration-500"
                       style={{ 
                         width: `${progress}%`,
-                        background: config.color
+                        background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`
                       }}
                     />
                   </div>

@@ -2,6 +2,7 @@ import { Star, Cpu, Rocket, Gem, Coins, Pickaxe, Activity } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { STAR_CONFIGS } from '../types/game';
 import Dashboard from '../components/Dashboard';
+import Achievements from '../components/Achievements';
 
 export default function HomePage() {
   const { player, stars, ais, ships, resources, collectResources } = useGameStore();
@@ -52,6 +53,10 @@ export default function HomePage() {
             <Pickaxe size={24} />
             <span>收集资源</span>
           </button>
+        </div>
+
+        <div className="mt-6">
+          <Achievements />
         </div>
 
         <h2 className="text-white font-bold text-lg mt-8 mb-4 flex items-center gap-2">

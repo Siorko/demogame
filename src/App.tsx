@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router } from 'react-router-dom';
 import { useGameStore } from './store/gameStore';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
@@ -11,11 +11,19 @@ import TechPage from './pages/TechPage';
 import ArenaPage from './pages/ArenaPage';
 
 export default function App() {
-  const { initializeGame, currentPage, setCurrentPage } = useGameStore();
+  const { initializeGame, currentPage, setCurrentPage, tick, collectResources } = useGameStore();
 
   useEffect(() => {
     initializeGame();
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tick();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [tick]);
 
   const renderPage = () => {
     switch (currentPage) {

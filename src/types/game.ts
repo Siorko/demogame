@@ -12,9 +12,9 @@ export interface Player {
   id: string;
   username: string;
   starcoins: number;
-  createdAt: Date;
-  lastOnline: Date;
-  mooncardExpires: Date | null;
+  createdAt: number;
+  lastOnline: number;
+  mooncardExpires: number | null;
   techLevel: number;
   techResetCount: number;
 }
@@ -28,10 +28,10 @@ export interface Star {
   totalResources: number;
   remainingResources: number;
   status: StarStatus;
-  activeUntil: Date;
-  dormantUntil: Date;
+  activeUntil: number;
+  dormantUntil: number;
   maintenanceFee: number;
-  createdAt: Date;
+  createdAt: number;
 }
 
 export interface AIEquipment {
@@ -47,13 +47,13 @@ export interface AI {
   profession: AIProfession;
   equipment: AIEquipment[];
   currentStarId: string | null;
-  createdAt: Date;
+  createdAt: number;
 }
 
 export interface Mission {
   type: 'exploring' | 'mining';
   targetStarId?: string;
-  startTime: Date;
+  startTime: number;
   duration: number;
 }
 
@@ -64,7 +64,7 @@ export interface Spaceship {
   level: 1 | 2 | 3 | 4 | 5;
   aiSlots: number;
   currentMission: Mission | null;
-  createdAt: Date;
+  createdAt: number;
 }
 
 export interface Miner {
@@ -72,7 +72,7 @@ export interface Miner {
   starId: string;
   level: number;
   isDeep: boolean;
-  installedAt: Date;
+  installedAt: number;
 }
 
 export interface Trade {
@@ -83,7 +83,7 @@ export interface Trade {
   price: number;
   shares: number;
   status: TradeStatus;
-  createdAt: Date;
+  createdAt: number;
 }
 
 export interface ArenaMatch {
@@ -94,8 +94,8 @@ export interface ArenaMatch {
   player1StarId: string;
   player2StarId: string;
   result: 'player1' | 'player2' | null;
-  createdAt: Date;
-  resolvedAt: Date | null;
+  createdAt: number;
+  resolvedAt: number | null;
 }
 
 export interface ResourcePrice {

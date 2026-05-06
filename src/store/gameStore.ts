@@ -140,8 +140,15 @@ export const useGameStore = create<GameState>()(
 
       initializeGame: () => {
         const state = get();
+        
+        const fullyUnlockedTechTree = TECH_TREE.map(tech => ({
+          ...tech,
+          unlocked: true
+        }));
+        
         if (state.stars.length > 0) {
           get().loadOfflineProgress();
+          set({ techTree: fullyUnlockedTechTree });
           return;
         }
         
@@ -160,7 +167,7 @@ export const useGameStore = create<GameState>()(
           arenaMatches: [],
           resources: createInitialResources(),
           prices: createInitialPrices(),
-          techTree: [...TECH_TREE],
+          techTree: fullyUnlockedTechTree,
           lastCollectTime: Date.now(),
           lastSaveTime: Date.now(),
           lastOnlineTime: Date.now()

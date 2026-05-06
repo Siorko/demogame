@@ -224,16 +224,16 @@ export const STAR_CONFIGS: Record<StarType, StarConfig> = {
 
 export const TECH_TREE: TechNode[] = [
   { id: 'basicMining', name: '基础采矿', description: '解锁基础采矿功能', cost: 0, prerequisites: [], unlocked: true, effect: '采矿速度+10%' },
-  { id: 'offlineIncome', name: '离线收益', description: '离线时也能获得采矿收益', cost: 1000, prerequisites: ['basicMining'], unlocked: false, effect: '离线收益+50%' },
-  { id: 'deepMining', name: '深层采矿', description: '开采更深层的矿石', cost: 5000, prerequisites: ['offlineIncome'], unlocked: false, effect: '速度+30%，消耗+20%资源' },
-  { id: 'starScan', name: '恒星扫描', description: '扫描附近星域', cost: 2000, prerequisites: ['basicMining'], unlocked: false, effect: '探索成功率+10%' },
-  { id: 'exploration', name: '探索技术', description: '解锁探索功能', cost: 3000, prerequisites: ['starScan'], unlocked: false, effect: '探索范围+50%' },
-  { id: 'arena', name: '竞技场', description: '解锁竞技场对赌', cost: 10000, prerequisites: ['exploration'], unlocked: false, effect: '可参与采矿对赌' },
-  { id: 'autoFactory', name: '自动工厂', description: '自动收集资源', cost: 8000, prerequisites: ['deepMining'], unlocked: false, effect: '自动收集资源' },
-  { id: 'starExchange', name: '恒星交易所', description: '解锁恒星交易', cost: 15000, prerequisites: ['autoFactory'], unlocked: false, effect: '可交易开采权' },
-  { id: 'deepSpace', name: '深空探测', description: '探索更远的星域', cost: 25000, prerequisites: ['starExchange'], unlocked: false, effect: '发现稀有恒星概率+20%' },
-  { id: 'minerUpgrade', name: '矿机升级', description: '升级矿机效率', cost: 30000, prerequisites: ['deepSpace'], unlocked: false, effect: '矿机效率+50%' },
-  { id: 'dysonFrame', name: '戴森框架', description: '建造戴森球的基础', cost: 100000, prerequisites: ['minerUpgrade'], unlocked: false, effect: '解锁戴森球建造' }
+  { id: 'offlineIncome', name: '离线收益', description: '离线时也能获得采矿收益', cost: 0, prerequisites: [], unlocked: true, effect: '离线收益+50%' },
+  { id: 'deepMining', name: '深层采矿', description: '开采更深层的矿石', cost: 0, prerequisites: [], unlocked: true, effect: '速度+30%，消耗+20%资源' },
+  { id: 'starScan', name: '恒星扫描', description: '扫描附近星域', cost: 0, prerequisites: [], unlocked: true, effect: '探索成功率+10%' },
+  { id: 'exploration', name: '探索技术', description: '解锁探索功能', cost: 0, prerequisites: [], unlocked: true, effect: '探索范围+50%' },
+  { id: 'arena', name: '竞技场', description: '解锁竞技场对赌', cost: 0, prerequisites: [], unlocked: true, effect: '可参与采矿对赌' },
+  { id: 'autoFactory', name: '自动工厂', description: '自动收集资源', cost: 0, prerequisites: [], unlocked: true, effect: '自动收集资源' },
+  { id: 'starExchange', name: '恒星交易所', description: '解锁恒星交易', cost: 0, prerequisites: [], unlocked: true, effect: '可交易开采权' },
+  { id: 'deepSpace', name: '深空探测', description: '探索更远的星域', cost: 0, prerequisites: [], unlocked: true, effect: '发现稀有恒星概率+20%' },
+  { id: 'minerUpgrade', name: '矿机升级', description: '升级矿机效率', cost: 0, prerequisites: [], unlocked: true, effect: '矿机效率+50%' },
+  { id: 'dysonFrame', name: '戴森框架', description: '建造戴森球的基础', cost: 0, prerequisites: [], unlocked: true, effect: '解锁戴森球建造' }
 ];
 
 export const AI_NAMES = [

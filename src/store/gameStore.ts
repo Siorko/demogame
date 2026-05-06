@@ -16,6 +16,7 @@ interface GameState {
   selectedStar: Star | null;
   exploring: boolean;
   explorationProgress: number;
+  lastCollectTime: Date;
   
   initializeGame: () => void;
   setCurrentPage: (page: string) => void;
@@ -29,6 +30,10 @@ interface GameState {
   buyShip: () => void;
   upgradeAI: (aiId: string) => void;
   startArenaMatch: (starId: string, stakePercentage: number) => void;
+  addMiner: (starId: string) => void;
+  upgradeMiner: (minerId: string) => void;
+  toggleDeepMiner: (minerId: string) => void;
+  addAIEquipment: (aiId: string, equipmentType: string) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -121,6 +126,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   selectedStar: null,
   exploring: false,
   explorationProgress: 0,
+  lastCollectTime: new Date(),
 
   initializeGame: () => {
     const player = createInitialPlayer();
@@ -138,7 +144,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       arenaMatches: [],
       resources: createInitialResources(),
       prices: createInitialPrices(),
-      techTree: [...TECH_TREE]
+      techTree: [...TECH_TREE],
+      lastCollectTime: new Date()
     });
   },
 
@@ -147,11 +154,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   selectStar: (star) => set({ selectedStar: star }),
 
   collectResources: () => {
-    const { stars, ais, ships, resources, player, techTree } = get();
+    const { stars, ais, ships, resources, player, techTree, miners } = get();
     const techMultiplier = techTree.filter(t => t.unlocked).length * 0.1 + 1;
     const deepMiningUnlocked = techTree.some(t => t.id === 'deepMining' && t.unlocked);
     
     let newResources = { ...resources };
+    let totalMined = 0;
+    
+    const now = new Date();
+    const timeDiff = now.getTime() - get().lastCollectTime.getTime();
+    const hoursSinceLastCollect = Math.min(timeDiff / (1000 * 60 * 60), 72);
+    const collectMultiplier = hoursSinceLastCollect / 24;
     
     stars.forEach(star => {
       if (star.status !== 'active' || star.remainingResources <= 0) return;
@@ -159,9 +172,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       const assignedAIs = ais.filter(ai => ai.currentStarId === star.id);
       if (assignedAIs.length === 0) return;
       
-      const aiTierSum = assignedAIs.reduce((sum, ai) => sum + ai.tier, 0);
-      const shipBonus = ships.length * 0.5;
-      const minerBonus = get().miners.filter(m => m.starId === star.id).length * 0.2;
+      const starMiners = miners.filter(m => m.starId === star.id);
+      const deepMiners = starMiners.filter(m => m.isDeep).length;
+      const normalMiners = starMiners.filter(m => !m.isDeep).length;
+      
+      const aiTierSum = assignedAIs.reduce((sum, ai) => {
+        let tier = ai.tier;
+        ai.equipment.forEach(eq => {
+          if (eq.type === 'drill') tier += eq.level * 0.5;
+          if (eq.type === 'chip') tier += eq.level * 0.3;
+        });
+        return sum + tier;
+      }, 0);
+      
+      const shipBonus = ships.reduce((sum, ship) => sum + ship.level * 0.5, 0);
+      const minerBonus = normalMiners * 0.2 + deepMiners * 0.4;
       
       let baseRate = aiTierSum * shipBonus * (1 + minerBonus);
       if (deepMiningUnlocked) {
@@ -171,29 +196,43 @@ export const useGameStore = create<GameState>((set, get) => ({
       baseRate *= techMultiplier;
       
       const config = STAR_CONFIGS[star.type];
-      const dailyRate = Math.floor(baseRate * 100);
-      const amountToMine = Math.min(dailyRate, star.remainingResources);
+      let dailyRate = Math.floor(baseRate * 100);
       
+      if (deepMiners > 0) {
+        dailyRate *= (1 + deepMiners * 0.3);
+      }
+      
+      const amountToMine = Math.min(Math.floor(dailyRate * collectMultiplier), star.remainingResources);
+      totalMined += amountToMine;
+      
+      const resourceAmount = amountToMine / config.resources.length;
       config.resources.forEach(resource => {
-        newResources[resource as keyof PlayerResources] += amountToMine / config.resources.length;
+        newResources[resource as keyof PlayerResources] += resourceAmount;
       });
       
       const newRemaining = star.remainingResources - amountToMine;
-      star.remainingResources = newRemaining;
+      star.remainingResources = Math.max(0, newRemaining);
       
-      if (newRemaining <= 0) {
+      if (star.remainingResources <= 0) {
         star.status = 'depleted';
+        star.activeUntil = now;
+        star.dormantUntil = new Date(now.getTime() + config.dormantDays * 24 * 60 * 60 * 1000);
       }
     });
     
-    const maintenanceCost = stars.reduce((sum, s) => sum + s.maintenanceFee, 0);
-    const newStarcoins = player.starcoins - maintenanceCost + Math.floor(newResources.iron * 0.1);
+    const activeStars = stars.filter(s => s.status === 'active');
+    const maintenanceCost = activeStars.reduce((sum, s) => sum + s.maintenanceFee * collectMultiplier, 0);
+    const ironEarnings = Math.floor(newResources.iron * 0.1);
+    const newStarcoins = player.starcoins - maintenanceCost + ironEarnings;
     
     set({ 
       resources: newResources, 
       stars: [...stars],
-      player: { ...player, starcoins: Math.max(0, newStarcoins) }
+      player: { ...player, starcoins: Math.max(0, newStarcoins) },
+      lastCollectTime: now
     });
+    
+    return totalMined;
   },
 
   sellResource: (resource, amount) => {
@@ -212,13 +251,23 @@ export const useGameStore = create<GameState>((set, get) => ({
   assignAI: (aiId, starId) => {
     const { ais } = get();
     const newAIs = ais.map(ai => 
-      ai.id === aiId ? { ...ai, currentStarId: starId } : ai
+      ai.id === aiId ? { ...ai, currentStarId: ai.currentStarId === starId ? null : starId } : ai
     );
     set({ ais: newAIs });
   },
 
   startExploration: () => {
-    set({ exploring: true, explorationProgress: 0 });
+    const { player } = get();
+    if (player.starcoins < 100) {
+      alert('星币不足！探索需要消耗100星币');
+      return;
+    }
+    
+    set(state => ({ 
+      exploring: true, 
+      explorationProgress: 0,
+      player: { ...state.player, starcoins: state.player.starcoins - 100 }
+    }));
     
     let progress = 0;
     const interval = setInterval(() => {
@@ -233,13 +282,19 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   completeExploration: () => {
-    const { player, stars } = get();
+    const { player, stars, ais, techTree } = get();
     const rand = Math.random();
     
     let newStar: Star | null = null;
     let message = '';
+    let reward = 0;
     
-    if (rand < 0.3) {
+    const explorationBonus = techTree.some(t => t.id === 'exploration' && t.unlocked) ? 1.2 : 1;
+    const starScanBonus = techTree.some(t => t.id === 'starScan' && t.unlocked) ? 1.1 : 1;
+    
+    const effectiveRand = Math.pow(rand, explorationBonus * starScanBonus);
+    
+    if (effectiveRand < 0.3) {
       const types: ('red' | 'yellow' | 'blue' | 'white' | 'neutron' | 'pulsar' | 'blackhole')[] = 
         ['red', 'yellow', 'blue', 'white', 'neutron', 'pulsar', 'blackhole'];
       const weights = [0.5, 0.25, 0.15, 0.05, 0.03, 0.015, 0.005];
@@ -273,19 +328,27 @@ export const useGameStore = create<GameState>((set, get) => ({
         createdAt: now
       };
       
-      message = `🎉 发现新恒星: ${newStar.name}!`;
-    } else if (rand < 0.55) {
+      reward = config.totalResources / 100;
+      message = `🎉 发现新恒星: ${newStar.name}! 获得 ${Math.floor(reward)} 星币奖励！`;
+    } else if (effectiveRand < 0.55) {
       message = '🪨 发现废弃恒星，资源已枯竭';
-    } else if (rand < 0.75) {
+    } else if (effectiveRand < 0.75) {
       message = '☄️ 遭遇陨石群，飞船受损';
-    } else if (rand < 0.9) {
-      message = '🏛️ 发现古代遗迹，获得神秘奖励！';
+    } else if (effectiveRand < 0.9) {
+      reward = 500 + Math.floor(Math.random() * 500);
+      message = `🏛️ 发现古代遗迹，获得 ${reward} 星币奖励！`;
     } else {
-      message = '👾 遭遇宇宙海盗，损失部分资源';
+      const loss = Math.floor(player.starcoins * 0.1);
+      message = `👾 遭遇宇宙海盗，损失 ${loss} 星币！`;
+      set(state => ({ player: { ...state.player, starcoins: Math.max(0, state.player.starcoins - loss) } }));
     }
     
     if (newStar) {
       set(state => ({ stars: [...state.stars, newStar] }));
+    }
+    
+    if (reward > 0) {
+      set(state => ({ player: { ...state.player, starcoins: state.player.starcoins + reward } }));
     }
     
     set({ exploring: false, explorationProgress: 0 });
@@ -301,7 +364,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       techTree.find(t => t.id === prereqId)?.unlocked
     );
     
-    if (!prereqsMet || player.starcoins < tech.cost) return;
+    if (!prereqsMet) {
+      alert('请先解锁前置科技！');
+      return;
+    }
+    
+    if (player.starcoins < tech.cost) {
+      alert('星币不足！');
+      return;
+    }
     
     const newTechTree = techTree.map(t => 
       t.id === techId ? { ...t, unlocked: true } : t
@@ -315,10 +386,18 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   buyShip: () => {
     const { player, ships } = get();
-    const nextLevel = Math.min(5, ships.length + 1) as 1 | 2 | 3 | 4 | 5;
+    if (ships.length >= 5) {
+      alert('最多拥有5艘飞船！');
+      return;
+    }
+    
+    const nextLevel = (ships.length + 1) as 1 | 2 | 3 | 4 | 5;
     const cost = nextLevel * 1000;
     
-    if (player.starcoins < cost) return;
+    if (player.starcoins < cost) {
+      alert('星币不足！');
+      return;
+    }
     
     const newShip: Spaceship = {
       id: generateId(),
@@ -342,7 +421,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!ai || ai.tier >= 6) return;
     
     const cost = ai.tier * 500;
-    if (player.starcoins < cost) return;
+    if (player.starcoins < cost) {
+      alert('星币不足！');
+      return;
+    }
     
     const newAIs = ais.map(a => 
       a.id === aiId ? { ...a, tier: (a.tier + 1) as AI['tier'] } : a
@@ -355,21 +437,43 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   startArenaMatch: (starId, stakePercentage) => {
-    const { player, stars } = get();
+    const { stars, arenaMatches, player } = get();
     const star = stars.find(s => s.id === starId);
-    if (!star || star.type === 'red') {
+    
+    if (!star) {
+      alert('找不到指定的恒星！');
+      return;
+    }
+    
+    if (star.type === 'red') {
       alert('红矮星不可用于对赌！');
+      return;
+    }
+    
+    const todayMatches = arenaMatches.filter(m => {
+      const matchDate = new Date(m.createdAt);
+      const today = new Date();
+      return matchDate.toDateString() === today.toDateString() && 
+             (m.player1Id === player.id || m.player2Id === player.id);
+    });
+    
+    if (todayMatches.length >= 3) {
+      alert('每天最多进行3次对赌！');
       return;
     }
     
     const simulatedOpponent = {
       id: generateId(),
       name: '神秘矿主',
-      star: { ...star, id: generateId(), remainingResources: star.remainingResources * (0.8 + Math.random() * 0.4) }
+      star: { 
+        ...star, 
+        id: generateId(), 
+        remainingResources: star.remainingResources * (0.6 + Math.random() * 0.8)
+      }
     };
     
-    const playerDaily = star.remainingResources / 30 * stakePercentage / 100;
-    const opponentDaily = simulatedOpponent.star.remainingResources / 30 * stakePercentage / 100;
+    const playerDaily = star.remainingResources / STAR_CONFIGS[star.type].activeDays * stakePercentage / 100;
+    const opponentDaily = simulatedOpponent.star.remainingResources / STAR_CONFIGS[star.type].activeDays * stakePercentage / 100;
     
     const win = playerDaily > opponentDaily;
     let message = '';
@@ -396,5 +500,134 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     set(state => ({ arenaMatches: [...state.arenaMatches, newMatch] }));
     alert(message);
+  },
+
+  addMiner: (starId) => {
+    const { player, stars, miners } = get();
+    const star = stars.find(s => s.id === starId);
+    
+    if (!star) {
+      alert('找不到指定的恒星！');
+      return;
+    }
+    
+    if (star.status !== 'active') {
+      alert('只能在活跃的恒星上安装矿机！');
+      return;
+    }
+    
+    const starMiners = miners.filter(m => m.starId === starId);
+    if (starMiners.length >= 10) {
+      alert('每颗恒星最多安装10台矿机！');
+      return;
+    }
+    
+    const cost = 200 * (starMiners.length + 1);
+    if (player.starcoins < cost) {
+      alert('星币不足！');
+      return;
+    }
+    
+    const newMiner: Miner = {
+      id: generateId(),
+      starId,
+      level: 1,
+      isDeep: false,
+      installedAt: new Date()
+    };
+    
+    set({ 
+      miners: [...miners, newMiner],
+      player: { ...player, starcoins: player.starcoins - cost }
+    });
+  },
+
+  upgradeMiner: (minerId) => {
+    const { player, miners } = get();
+    const miner = miners.find(m => m.id === minerId);
+    
+    if (!miner || miner.level >= 5) return;
+    
+    const cost = miner.level * 300;
+    if (player.starcoins < cost) {
+      alert('星币不足！');
+      return;
+    }
+    
+    const newMiners = miners.map(m => 
+      m.id === minerId ? { ...m, level: m.level + 1 } : m
+    );
+    
+    set({ 
+      miners: newMiners,
+      player: { ...player, starcoins: player.starcoins - cost }
+    });
+  },
+
+  toggleDeepMiner: (minerId) => {
+    const { miners } = get();
+    const miner = miners.find(m => m.id === minerId);
+    
+    if (!miner) return;
+    
+    const newMiners = miners.map(m => 
+      m.id === minerId ? { ...m, isDeep: !m.isDeep } : m
+    );
+    
+    set({ miners: newMiners });
+  },
+
+  addAIEquipment: (aiId, equipmentType) => {
+    const { player, ais } = get();
+    const ai = ais.find(a => a.id === aiId);
+    
+    if (!ai) return;
+    
+    const existingEquip = ai.equipment.find(e => e.type === equipmentType);
+    if (existingEquip) {
+      if (existingEquip.level >= 5) {
+        alert('装备已达最高等级！');
+        return;
+      }
+      
+      const cost = existingEquip.level * 200;
+      if (player.starcoins < cost) {
+        alert('星币不足！');
+        return;
+      }
+      
+      const newAIs = ais.map(a => {
+        if (a.id === aiId) {
+          const newEquipment = a.equipment.map(e => 
+            e.type === equipmentType ? { ...e, level: e.level + 1 } : e
+          );
+          return { ...a, equipment: newEquipment };
+        }
+        return a;
+      });
+      
+      set({ 
+        ais: newAIs,
+        player: { ...player, starcoins: player.starcoins - cost }
+      });
+    } else {
+      const cost = 100;
+      if (player.starcoins < cost) {
+        alert('星币不足！');
+        return;
+      }
+      
+      const newAIs = ais.map(a => {
+        if (a.id === aiId) {
+          return { ...a, equipment: [...a.equipment, { type: equipmentType as any, level: 1 }] };
+        }
+        return a;
+      });
+      
+      set({ 
+        ais: newAIs,
+        player: { ...player, starcoins: player.starcoins - cost }
+      });
+    }
   }
 }));

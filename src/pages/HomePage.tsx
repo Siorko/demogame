@@ -1,20 +1,59 @@
-import { Star, Cpu, Rocket, Gem, Coins, Pickaxe, Activity, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Star, Cpu, Rocket, Pickaxe, TrendingUp, Zap, Coins, Play } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { STAR_CONFIGS } from '../types/game';
 import Dashboard from '../components/Dashboard';
-import Achievements from '../components/Achievements';
 
 export default function HomePage() {
-  const { player, stars, ais, ships, resources, collectResources } = useGameStore();
+  const { player, stars, ais, resources, collectResources, calculateHourlyRate } = useGameStore();
+  const [displayResources, setDisplayResources] = useState<Record<string, number>>({});
+  const [prevResources, setPrevResources] = useState<Record<string, number>>({});
+  const [showIncrease, setShowIncrease] = useState<Record<string, boolean>>({});
 
   const activeStars = stars.filter(s => s.status === 'active');
-  const depletedStars = stars.filter(s => s.status === 'depleted');
-  const dormantStars = stars.filter(s => s.status === 'dormant');
+
+  useEffect(() => {
+    const newDisplay: Record<string, number> = {};
+    Object.keys(resources).forEach(key => {
+      newDisplay[key] = Math.floor(resources[key as keyof typeof resources]);
+    });
+    
+    const newShowIncrease: Record<string, boolean> = {};
+    Object.keys(newDisplay).forEach(key => {
+      const prev = prevResources[key] || 0;
+      if (newDisplay[key] > prev) {
+        newShowIncrease[key] = true;
+        setTimeout(() => setShowIncrease(prev => ({ ...prev, [key]: false })), 500);
+      }
+    });
+    
+    setDisplayResources(newDisplay);
+    setPrevResources(newDisplay);
+    setShowIncrease(newShowIncrease);
+  }, [resources]);
+
+  const hourlyRate = calculateHourlyRate();
+  const totalResources = Object.values(resources).reduce((sum, val) => sum + val, 0);
+
+  const resourceNames: Record<string, string> = {
+    iron: '铁矿',
+    titanium: '钛合金',
+    crystal: '能量晶体',
+    rareOre: '稀有矿石',
+    nano: '纳米材料',
+    darkMatter: '暗物质',
+    antiMatter: '反物质',
+    exoticMatter: '奇异物质'
+  };
+
+  const mainResource = Object.entries(resources).find(([, val]) => val > 0) || ['iron', 0];
+  const mainResourceName = resourceNames[mainResource[0]];
+  const mainResourceValue = Math.floor(mainResource[1]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f3460] pb-32 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] via-[#1a1a2e] to-[#0f1a2e] pb-32 relative overflow-hidden">
       <div className="absolute inset-0 star-field">
-        {[...Array(100)].map((_, i) => (
+        {[...Array(150)].map((_, i) => (
           <div
             key={i}
             className="star animate-star-twinkle"
@@ -30,110 +69,174 @@ export default function HomePage() {
         ))}
       </div>
 
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#4ECDC4]/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#9B59B6]/5 rounded-full blur-3xl" />
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#4ECDC4]/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#9B59B6]/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
 
-      <div className="relative z-10 p-6">
-        <div className="text-center mb-6 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 mb-2 px-4 py-2 bg-gradient-to-r from-[#4ECDC4]/20 to-[#9B59B6]/20 rounded-full border border-[#4ECDC4]/30">
-            <Sparkles className="text-[#FFE66D]" size={16} />
-            <span className="text-[#4ECDC4] text-sm">欢迎来到星际矿业主</span>
-          </div>
-          <h1 className="text-3xl font-bold gradient-text mb-2">
+      <div className="relative z-10 p-4">
+        <div className="text-center mb-6">
+          <h1 className="text-4xl font-bold gradient-text mb-2">
             星际矿业主
           </h1>
-          <p className="text-gray-400">探索宇宙，开采无限资源</p>
-        </div>
-
-        <div className="glass-card p-2 mb-6 border-gradient animate-slide-in-left">
-          <div className="flex items-center justify-between px-4 py-2">
-            <div className="flex items-center gap-2">
-              <Activity className="text-[#4ECDC4]" size={18} />
-              <span className="text-[#4ECDC4] text-sm font-medium">主运行台</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Coins className="text-[#FFE66D]" size={16} />
-              <span className="text-[#FFE66D] font-bold">{player.starcoins.toLocaleString()}</span>
-            </div>
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <span className="text-gray-400">{stars.length} 颗恒星</span>
+            <span className="text-gray-400">•</span>
+            <span className="text-gray-400">{ais.length} 个AI</span>
+            <span className="text-gray-400">•</span>
+            <span className="text-gray-400">{activeStars.length} 活跃</span>
           </div>
         </div>
 
-        <div className="animate-slide-in-right">
-          <Dashboard />
+        <div className="glass-card p-6 mb-4 border-gradient-animated">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm mb-2">当前 {mainResourceName}</p>
+            <div className="relative">
+              <p className={`text-5xl md:text-6xl font-bold text-white font-mono transition-all duration-300 ${
+                showIncrease[mainResource[0]] ? 'text-green-400 scale-110' : ''
+              }`}>
+                {mainResourceValue.toLocaleString()}
+              </p>
+              {showIncrease[mainResource[0]] && (
+                <span className="absolute -top-4 right-0 text-green-400 text-lg animate-bounce">
+                  +1
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <TrendingUp className="text-green-400" size={16} />
+              <span className="text-green-400 font-medium">
+                +{Math.floor(hourlyRate / 3600 * 100) / 100}/秒
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-[#4ECDC4]/20">
+            {Object.entries(resources).filter(([, val]) => val > 0).slice(0, 4).map(([key, val]) => (
+              <div key={key} className={`text-center p-2 rounded-lg ${
+                showIncrease[key] ? 'bg-green-500/20' : 'bg-[#0f3460]/50'
+              }`}>
+                <p className="text-xs text-gray-400">{resourceNames[key]}</p>
+                <p className={`text-sm font-bold text-white font-mono ${
+                  showIncrease[key] ? 'text-green-400' : ''
+                }`}>
+                  {Math.floor(val).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-6 animate-fade-in-up">
+        <div className="glass-card p-4 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Coins className="text-[#FFE66D]" size={20} />
+              <span className="text-white font-bold">星币</span>
+            </div>
+            <span className="text-[#FFE66D] font-bold text-xl font-mono">
+              {player.starcoins.toLocaleString()}
+            </span>
+          </div>
+
           <button
             onClick={collectResources}
-            className="w-full btn-primary flex items-center justify-center gap-2 animate-pulse-glow"
+            className="w-full btn-primary flex items-center justify-center gap-2"
           >
-            <Pickaxe size={24} />
-            <span>收集资源</span>
+            <Play size={20} />
+            收集资源
           </button>
         </div>
 
-        <div className="mt-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <Achievements />
+        <div className="glass-card p-4 mb-4">
+          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+            <Zap className="text-yellow-400" size={18} />
+            快速部署
+          </h3>
+          
+          <div className="space-y-2">
+            {stars.slice(0, 3).map((star, index) => {
+              const config = STAR_CONFIGS[star.type];
+              const assignedAIs = ais.filter(ai => ai.currentStarId === star.id);
+              
+              return (
+                <div
+                  key={star.id}
+                  className="flex items-center gap-3 p-3 bg-[#0f3460]/50 rounded-xl"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <span className="text-3xl">{config.icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white font-medium">{star.name}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        star.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {assignedAIs.length} AI
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(star.remainingResources / star.totalResources) * 100}%`,
+                          background: config.color
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <h2 className="text-white font-bold text-lg mt-8 mb-4 flex items-center gap-2">
+        <Dashboard />
+
+        <h2 className="text-white font-bold text-lg mt-6 mb-4 flex items-center gap-2">
           <Star className="text-[#4ECDC4]" size={20} />
-          我的恒星
+          全部恒星
         </h2>
         
-        <div className="space-y-3">
-          {stars.map((star, index) => {
+        <div className="space-y-2">
+          {stars.map(star => {
             const config = STAR_CONFIGS[star.type];
-            const progress = (star.remainingResources / star.totalResources) * 100;
+            const assignedAIs = ais.filter(ai => ai.currentStarId === star.id);
             
             return (
               <div
                 key={star.id}
-                className="glass-card p-4 card-hover-lift animate-fade-in-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
+                className="glass-card p-4"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl animate-star-twinkle" style={{ animationDelay: `${index * 0.2}s` }}>
-                      {config.icon}
-                    </span>
-                    <div>
-                      <h3 className="text-white font-medium">{star.name}</h3>
-                      <p className="text-gray-400 text-xs">{config.name} · 维护费: {star.maintenanceFee}/天</p>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">{config.icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white font-medium">{star.name}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        star.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {assignedAIs.length} AI
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{ 
+                          width: `${(star.remainingResources / star.totalResources) * 100}%`,
+                          background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`
+                        }}
+                      />
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    star.status === 'active' ? 'bg-green-500/20 text-green-400 glow-green' :
-                    star.status === 'depleted' ? 'bg-gray-500/20 text-gray-400' :
-                    'bg-blue-500/20 text-blue-400 glow-blue'
-                  }`}>
-                    {star.status === 'active' ? '活跃' : star.status === 'depleted' ? '枯竭' : '休眠'}
-                  </span>
                 </div>
-                <div className="w-full progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ 
-                      width: `${progress}%`,
-                      background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-gray-400 text-xs">剩余资源</span>
-                  <span className="text-white text-xs font-mono">{star.remainingResources.toLocaleString()}</span>
+                <div className="flex justify-between text-xs text-gray-400">
+                  <span>{star.remainingResources.toLocaleString()} / {star.totalResources.toLocaleString()}</span>
+                  <span>维护: {star.maintenanceFee}/天</span>
                 </div>
               </div>
             );
           })}
         </div>
-
-        {stars.length === 0 && (
-          <div className="text-center py-12 animate-fade-in-up">
-            <Star className="text-gray-600 mx-auto mb-4" size={64} />
-            <p className="text-gray-400">还没有恒星，快去探索吧！</p>
-          </div>
-        )}
       </div>
     </div>
   );

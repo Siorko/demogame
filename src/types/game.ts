@@ -245,3 +245,48 @@ export const SHIP_NAMES = [
   '探索者号', '先驱者号', '旅行者号', '发现号', '企业号',
   '银河号', '星辰号', '星云号', '彗星号', '猎户号'
 ];
+
+export interface PriceHistoryItem {
+  time: number;
+  price: number;
+}
+
+export interface PriceConfig {
+  basePrice: number;
+  minMultiplier: number;
+  maxMultiplier: number;
+  volatility: number;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  rewardType: 'starcoins' | 'resource' | 'permanent';
+  rewardAmount: number;
+  rewardResource?: keyof PlayerResources;
+  unlocked: boolean;
+  claimed: boolean;
+}
+
+export const ACHIEVEMENTS: Achievement[] = [
+  { id: 'firstStar', name: '星际先驱', description: '发现第一颗恒星', rewardType: 'starcoins', rewardAmount: 100, unlocked: false, claimed: false },
+  { id: 'tenStars', name: '星际领主', description: '发现10颗恒星', rewardType: 'starcoins', rewardAmount: 1000, unlocked: false, claimed: false },
+  { id: 't5AI', name: '顶级矿工', description: '拥有T5级AI', rewardType: 'starcoins', rewardAmount: 500, unlocked: false, claimed: false },
+  { id: 'lv5Ship', name: '宇宙旗舰', description: '拥有5级飞船', rewardType: 'starcoins', rewardAmount: 2000, unlocked: false, claimed: false },
+  { id: 'millionaire', name: '星际富豪', description: '累计获得100万资源', rewardType: 'starcoins', rewardAmount: 5000, unlocked: false, claimed: false },
+  { id: 'arenaWinner', name: '竞技场霸主', description: '在竞技场获胜10次', rewardType: 'starcoins', rewardAmount: 3000, unlocked: false, claimed: false },
+  { id: 'dysonSphere', name: '戴森球建造者', description: '建造戴森球', rewardType: 'permanent', rewardAmount: 1, unlocked: false, claimed: false },
+  { id: 'techMaster', name: '科技大师', description: '解锁所有科技', rewardType: 'starcoins', rewardAmount: 10000, unlocked: false, claimed: false },
+];
+
+export const RESOURCE_PRICE_CONFIGS: Record<string, PriceConfig> = {
+  iron: { basePrice: 1, minMultiplier: 0.5, maxMultiplier: 1.5, volatility: 0.1 },
+  titanium: { basePrice: 5, minMultiplier: 0.6, maxMultiplier: 1.4, volatility: 0.15 },
+  crystal: { basePrice: 15, minMultiplier: 0.7, maxMultiplier: 1.3, volatility: 0.2 },
+  rareOre: { basePrice: 50, minMultiplier: 0.7, maxMultiplier: 1.3, volatility: 0.2 },
+  nano: { basePrice: 200, minMultiplier: 0.8, maxMultiplier: 1.2, volatility: 0.15 },
+  darkMatter: { basePrice: 1000, minMultiplier: 0.9, maxMultiplier: 1.1, volatility: 0.1 },
+  antiMatter: { basePrice: 5000, minMultiplier: 0.85, maxMultiplier: 1.15, volatility: 0.12 },
+  exoticMatter: { basePrice: 20000, minMultiplier: 0.9, maxMultiplier: 1.1, volatility: 0.08 }
+};

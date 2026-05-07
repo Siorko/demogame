@@ -9,6 +9,7 @@ import ExchangePage from './pages/ExchangePage';
 import ExplorePage from './pages/ExplorePage';
 import TechPage from './pages/TechPage';
 import ArenaPage from './pages/ArenaPage';
+import DysonSpherePage from './pages/DysonSpherePage';
 
 export default function App() {
   const { initializeGame, currentPage, setCurrentPage, tick, collectResources } = useGameStore();
@@ -41,6 +42,8 @@ export default function App() {
         return <TechPage />;
       case 'arena':
         return <ArenaPage />;
+      case 'dyson':
+        return <DysonSpherePage />;
       default:
         return <HomePage />;
     }

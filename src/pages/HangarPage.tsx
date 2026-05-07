@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plane, Cpu, Plus, ArrowRight, Star, Shield, Battery, Cpu as ChipIcon, Compass, Zap, Pickaxe } from 'lucide-react';
+import { Plane, Cpu, Plus, ArrowRight, Star, Shield, Battery, Cpu as ChipIcon, Compass, Zap, Pickaxe, AlertCircle, TrendingUp } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { STAR_CONFIGS } from '../types/game';
 import type { AI, Star as StarType } from '../types/game';
@@ -29,14 +29,14 @@ const equipmentTypes = [
 ];
 
 export default function HangarPage() {
-  const { ais, ships, stars, assignAI, upgradeAI, buyShip, selectedStar, selectStar } = useGameStore();
+  const { ais, ships, stars, assignAI, buyShip, selectedStar, selectStar, aiUpgradeFailStreak, upgradeAIWithGuarantee, addAIEquipment } = useGameStore();
   const [selectedAI, setSelectedAI] = useState<AI | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'ai' | 'ship' | 'miner'>('ai');
 
   const handleAIUpgrade = (ai: AI) => {
     if (ai.tier >= 6) return;
-    upgradeAI(ai.id);
+    upgradeAIWithGuarantee(ai.id);
   };
 
   const handleAssignAI = () => {
@@ -47,6 +47,16 @@ export default function HangarPage() {
       selectStar(null);
     }
   };
+
+  const getGuaranteeInfo = () => {
+    const remaining = 5 - aiUpgradeFailStreak;
+    if (remaining <= 0) {
+      return { text: '下次必成！', color: 'text-yellow-400' };
+    }
+    return { text: `连败 ${aiUpgradeFailStreak}/5`, color: aiUpgradeFailStreak > 0 ? 'text-orange-400' : 'text-gray-400' };
+  };
+
+  const guaranteeInfo = getGuaranteeInfo();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f3460] pb-32">
@@ -104,6 +114,10 @@ export default function HangarPage() {
                 <Cpu className="text-[#FF6B6B]" size={20} />
                 AI矿工 ({ais.length})
               </h2>
+              <div className="flex items-center gap-2">
+                <AlertCircle className={guaranteeInfo.color} size={16} />
+                <span className={`text-xs font-medium ${guaranteeInfo.color}`}>{guaranteeInfo.text}</span>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -146,13 +160,15 @@ export default function HangarPage() {
                       {equipmentTypes.map(eq => {
                         const hasEquip = ai.equipment.find(e => e.type === eq.type);
                         return (
-                          <div
+                          <button
                             key={eq.type}
-                            className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center ${hasEquip ? eq.bg : 'bg-[#0f3460]'} ${hasEquip ? eq.color : 'text-gray-600'}`}
+                            onClick={() => addAIEquipment(ai.id, eq.type)}
+                            className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center ${hasEquip ? eq.bg : 'bg-[#0f3460]'} ${hasEquip ? eq.color : 'text-gray-600'} hover:opacity-80 transition-all`}
+                            title={hasEquip ? `${eq.name} Lv.${hasEquip.level} (点击升级)` : `${eq.name} (点击装备)`}
                           >
                             <eq.icon size={16} />
                             {hasEquip && <span className="text-[10px]">Lv.{hasEquip.level}</span>}
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -172,9 +188,10 @@ export default function HangarPage() {
                       <button
                         onClick={() => handleAIUpgrade(ai)}
                         disabled={ai.tier >= 6}
-                        className="px-4 py-2 bg-gradient-to-r from-[#9B59B6] to-[#8E44AD] rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-[#9B59B6]/30 transition-all"
+                        className="px-4 py-2 bg-gradient-to-r from-[#9B59B6] to-[#8E44AD] rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-[#9B59B6]/30 transition-all flex items-center gap-2"
                       >
-                        升级 ({ai.tier * 500}星币)
+                        <TrendingUp size={16} />
+                        <span>升级 ({ai.tier * 1000}星币)</span>
                       </button>
                     </div>
                   </div>

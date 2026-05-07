@@ -1,4 +1,4 @@
-import { Home, Store, Plane, TrendingUp, Compass, FlaskConical, Trophy } from 'lucide-react';
+import { Home, Store, Plane, TrendingUp, Compass, FlaskConical, Trophy, Sparkles } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { id: 'explore', icon: Compass, label: '探索' },
   { id: 'tech', icon: FlaskConical, label: '科技' },
   { id: 'arena', icon: Trophy, label: '竞技场' },
+  { id: 'dyson', icon: Sparkles, label: '戴森球' },
 ];
 
 export default function Navbar() {

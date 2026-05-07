@@ -1,16 +1,44 @@
 import { useState, useEffect } from 'react';
-import { Star, Cpu, Rocket, Pickaxe, TrendingUp, Zap, Coins, Play } from 'lucide-react';
+import { Star, Cpu, Rocket, Pickaxe, TrendingUp, Zap, Coins, Play, Clock, CheckCircle } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { STAR_CONFIGS } from '../types/game';
 import Dashboard from '../components/Dashboard';
 
 export default function HomePage() {
-  const { player, stars, ais, resources, collectResources, calculateHourlyRate } = useGameStore();
+  const { player, stars, ais, resources, collectResources, calculateHourlyRate, lastOnlineTime } = useGameStore();
   const [displayResources, setDisplayResources] = useState<Record<string, number>>({});
   const [prevResources, setPrevResources] = useState<Record<string, number>>({});
   const [showIncrease, setShowIncrease] = useState<Record<string, boolean>>({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const activeStars = stars.filter(s => s.status === 'active');
+  const depletedStars = stars.filter(s => s.status === 'depleted');
+
+  const getStatusInfo = (star: any) => {
+    if (star.status === 'depleted') {
+      const timeLeft = Math.max(0, star.dormantUntil - currentTime);
+      const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+      const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      const secondsLeft = Math.floor((timeLeft % (1000 * 60)) / 1000);
+      
+      return {
+        label: '休眠中',
+        className: 'bg-purple-500/20 text-purple-400',
+        extra: `${hoursLeft}h ${minutesLeft}m ${secondsLeft}s 后恢复`
+      };
+    }
+    
+    return {
+      label: '活跃',
+      className: 'bg-green-500/20 text-green-400',
+      extra: `${(star.remainingResources / star.totalResources * 100).toFixed(1)}% 剩余`
+    };
+  };
 
   useEffect(() => {
     const newDisplay: Record<string, number> = {};
@@ -82,9 +110,15 @@ export default function HomePage() {
           <div className="flex items-center justify-center gap-4 text-sm">
             <span className="text-gray-400">{stars.length} 颗恒星</span>
             <span className="text-gray-400">•</span>
-            <span className="text-gray-400">{ais.length} 个AI</span>
+            <span className="text-green-400">{activeStars.length} 活跃</span>
             <span className="text-gray-400">•</span>
-            <span className="text-gray-400">{activeStars.length} 活跃</span>
+            {depletedStars.length > 0 && (
+              <>
+                <span className="text-purple-400">{depletedStars.length} 休眠</span>
+                <span className="text-gray-400">•</span>
+              </>
+            )}
+            <span className="text-gray-400">{ais.length} 个AI</span>
           </div>
         </div>
 
@@ -147,6 +181,40 @@ export default function HomePage() {
           </button>
         </div>
 
+        {depletedStars.length > 0 && (
+          <div className="glass-card p-4 mb-4 border border-purple-500/30">
+            <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+              <Clock className="text-purple-400" size={18} />
+              休眠恒星
+            </h3>
+            
+            <div className="space-y-2">
+              {depletedStars.map(star => {
+                const config = STAR_CONFIGS[star.type];
+                const status = getStatusInfo(star);
+                
+                return (
+                  <div key={star.id} className="flex items-center gap-3 p-3 bg-[#2a1a4a]/50 rounded-xl">
+                    <span className="text-2xl opacity-50">{config.icon}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400">{star.name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${status.className}`}>
+                          休眠中
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-purple-400">
+                        <CheckCircle size={12} />
+                        <span>{status.extra}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="glass-card p-4 mb-4">
           <h3 className="text-white font-bold mb-3 flex items-center gap-2">
             <Zap className="text-yellow-400" size={18} />
@@ -157,32 +225,40 @@ export default function HomePage() {
             {stars.slice(0, 3).map((star, index) => {
               const config = STAR_CONFIGS[star.type];
               const assignedAIs = ais.filter(ai => ai.currentStarId === star.id);
+              const status = getStatusInfo(star);
               
               return (
                 <div
                   key={star.id}
-                  className="flex items-center gap-3 p-3 bg-[#0f3460]/50 rounded-xl"
+                  className={`flex items-center gap-3 p-3 rounded-xl ${
+                    star.status === 'depleted' ? 'bg-purple-900/20' : 'bg-[#0f3460]/50'
+                  }`}
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <span className="text-3xl">{config.icon}</span>
+                  <span className={`text-3xl ${star.status === 'depleted' ? 'opacity-50' : ''}`}>
+                    {config.icon}
+                  </span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="text-white font-medium">{star.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        star.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {assignedAIs.length} AI
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${status.className}`}>
+                        {status.label}
                       </span>
                     </div>
-                    <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${(star.remainingResources / star.totalResources) * 100}%`,
-                          background: config.color
-                        }}
-                      />
-                    </div>
+                    {star.status === 'active' && (
+                      <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${(star.remainingResources / star.totalResources) * 100}%`,
+                            background: config.color
+                          }}
+                        />
+                      </div>
+                    )}
+                    {star.status === 'active' && assignedAIs.length > 0 && (
+                      <p className="text-xs text-green-400 mt-1">{assignedAIs.length} AI 正在工作</p>
+                    )}
                   </div>
                 </div>
               );
@@ -201,38 +277,55 @@ export default function HomePage() {
           {stars.map(star => {
             const config = STAR_CONFIGS[star.type];
             const assignedAIs = ais.filter(ai => ai.currentStarId === star.id);
+            const status = getStatusInfo(star);
             
             return (
               <div
                 key={star.id}
-                className="glass-card p-4"
+                className={`glass-card p-4 ${
+                  star.status === 'depleted' ? 'border-purple-500/30' : ''
+                }`}
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">{config.icon}</span>
+                  <span className={`text-2xl ${star.status === 'depleted' ? 'opacity-50' : ''}`}>
+                    {config.icon}
+                  </span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <span className="text-white font-medium">{star.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        star.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {assignedAIs.length} AI
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${status.className}`}>
+                        {status.label}
                       </span>
                     </div>
-                    <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${(star.remainingResources / star.totalResources) * 100}%`,
-                          background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`
-                        }}
-                      />
-                    </div>
+                    {star.status === 'active' && (
+                      <div className="w-full bg-[#16213e] rounded-full h-1.5 mt-1 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${(star.remainingResources / star.totalResources) * 100}%`,
+                            background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-between text-xs text-gray-400">
                   <span>{star.remainingResources.toLocaleString()} / {star.totalResources.toLocaleString()}</span>
                   <span>维护: {star.maintenanceFee}/天</span>
                 </div>
+                {star.status === 'active' && assignedAIs.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Cpu size={12} className="text-cyan-400" />
+                    <span className="text-xs text-cyan-400">{assignedAIs.length} AI 工作中</span>
+                  </div>
+                )}
+                {star.status === 'depleted' && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Clock size={12} className="text-purple-400" />
+                    <span className="text-xs text-purple-400">{status.extra}</span>
+                  </div>
+                )}
               </div>
             );
           })}

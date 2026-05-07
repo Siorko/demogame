@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Player, Star, AI, Spaceship, Miner, Trade, ArenaMatch, PlayerResources, ResourcePrice, TechNode, STAR_CONFIGS, TECH_TREE, AI_NAMES, SHIP_NAMES } from '../types/game';
+import { Player, Star, AI, Spaceship, Miner, Trade, ArenaMatch, PlayerResources, ResourcePrice, TechNode, STAR_CONFIGS, TECH_TREE, AI_NAMES, SHIP_NAMES, RESOURCE_PRICE_CONFIGS, Achievement, ACHIEVEMENTS } from '../types/game';
 
 interface GameState {
   player: Player;
@@ -20,6 +20,13 @@ interface GameState {
   lastCollectTime: number;
   lastSaveTime: number;
   lastOnlineTime: number;
+  lastPriceUpdateTime: number;
+  priceHistory: Record<string, { time: number; price: number }[]>;
+  aiUpgradeFailStreak: number;
+  dysonSphereBuilt: boolean;
+  dysonSphereProgress: number;
+  achievements: Achievement[];
+  totalResourcesEarned: number;
   
   initializeGame: () => void;
   setCurrentPage: (page: string) => void;
@@ -32,15 +39,20 @@ interface GameState {
   unlockTech: (techId: string) => void;
   buyShip: () => void;
   upgradeAI: (aiId: string) => void;
+  upgradeAIWithGuarantee: (aiId: string) => void;
   startArenaMatch: (starId: string, stakePercentage: number) => void;
   addMiner: (starId: string) => void;
   upgradeMiner: (minerId: string) => void;
   toggleDeepMiner: (minerId: string) => void;
   addAIEquipment: (aiId: string, equipmentType: string) => void;
+  buildDysonSphere: () => void;
+  contributeToDysonSphere: (resourceType: keyof PlayerResources, amount: number) => void;
   calculateHourlyRate: () => number;
   tick: () => void;
   saveGame: () => void;
   loadOfflineProgress: () => void;
+  checkAchievements: () => void;
+  claimAchievement: (achievementId: string) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -117,6 +129,37 @@ const createInitialPrices = (): ResourcePrice => ({
   exoticMatter: 20000
 });
 
+const createInitialPriceHistory = (): Record<string, { time: number; price: number }[]> => ({
+  iron: [],
+  titanium: [],
+  crystal: [],
+  rareOre: [],
+  nano: [],
+  darkMatter: [],
+  antiMatter: [],
+  exoticMatter: []
+});
+
+const updatePrices = (currentPrices: ResourcePrice, now: number): ResourcePrice => {
+  const newPrices: ResourcePrice = { ...currentPrices };
+  
+  Object.keys(RESOURCE_PRICE_CONFIGS).forEach(resource => {
+    const config = RESOURCE_PRICE_CONFIGS[resource];
+    const currentPrice = currentPrices[resource as keyof ResourcePrice];
+    
+    const change = (Math.random() - 0.5) * 2 * config.volatility * currentPrice;
+    let newPrice = currentPrice + change;
+    
+    const minPrice = config.basePrice * config.minMultiplier;
+    const maxPrice = config.basePrice * config.maxMultiplier;
+    
+    newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
+    newPrices[resource as keyof ResourcePrice] = Math.floor(newPrice * 100) / 100;
+  });
+  
+  return newPrices;
+};
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
@@ -137,6 +180,13 @@ export const useGameStore = create<GameState>()(
       lastCollectTime: Date.now(),
       lastSaveTime: Date.now(),
       lastOnlineTime: Date.now(),
+      lastPriceUpdateTime: Date.now(),
+      priceHistory: createInitialPriceHistory(),
+      aiUpgradeFailStreak: 0,
+      dysonSphereBuilt: false,
+      dysonSphereProgress: 0,
+      achievements: [...ACHIEVEMENTS],
+      totalResourcesEarned: 0,
 
       initializeGame: () => {
         const state = get();
@@ -149,6 +199,7 @@ export const useGameStore = create<GameState>()(
         if (state.stars.length > 0) {
           get().loadOfflineProgress();
           set({ techTree: fullyUnlockedTechTree });
+          get().checkAchievements();
           return;
         }
         
@@ -170,7 +221,9 @@ export const useGameStore = create<GameState>()(
           techTree: fullyUnlockedTechTree,
           lastCollectTime: Date.now(),
           lastSaveTime: Date.now(),
-          lastOnlineTime: Date.now()
+          lastOnlineTime: Date.now(),
+          achievements: [...ACHIEVEMENTS],
+          totalResourcesEarned: 0
         });
       },
 
@@ -179,8 +232,9 @@ export const useGameStore = create<GameState>()(
       selectStar: (star) => set({ selectedStar: star }),
 
       calculateHourlyRate: () => {
-        const { stars, ais, ships, techTree, miners } = get();
+        const { stars, ais, ships, techTree, miners, dysonSphereBuilt } = get();
         const techMultiplier = techTree.filter(t => t.unlocked).length * 0.1 + 1;
+        const dysonMultiplier = dysonSphereBuilt ? 2 : 1;
         
         let totalRate = 0;
         
@@ -207,6 +261,8 @@ export const useGameStore = create<GameState>()(
           
           let baseRate = aiTierSum * shipBonus * (1 + minerBonus);
           baseRate *= techMultiplier;
+          baseRate *= dysonMultiplier;
+          baseRate *= dysonMultiplier;
           
           let dailyRate = Math.floor(baseRate * 100);
           
@@ -221,8 +277,9 @@ export const useGameStore = create<GameState>()(
       },
 
       collectResources: () => {
-        const { stars, ais, ships, resources, player, techTree, miners, lastCollectTime } = get();
+        const { stars, ais, ships, resources, player, techTree, miners, lastCollectTime, dysonSphereBuilt } = get();
         const techMultiplier = techTree.filter(t => t.unlocked).length * 0.1 + 1;
+        const dysonMultiplier = dysonSphereBuilt ? 2 : 1;
         
         const now = Date.now();
         const timeDiff = now - lastCollectTime;
@@ -254,6 +311,7 @@ export const useGameStore = create<GameState>()(
           
           let baseRate = aiTierSum * shipBonus * (1 + minerBonus);
           baseRate *= techMultiplier;
+          baseRate *= dysonMultiplier;
           
           const config = STAR_CONFIGS[star.type];
           let dailyRate = Math.floor(baseRate * 100);
@@ -291,14 +349,37 @@ export const useGameStore = create<GameState>()(
       },
 
       tick: () => {
-        const { stars, ais, ships, resources, player, techTree, miners, lastCollectTime, lastSaveTime } = get();
+        const { stars, ais, ships, resources, player, techTree, miners, lastCollectTime, lastSaveTime, lastPriceUpdateTime, prices, priceHistory, dysonSphereBuilt } = get();
         const now = Date.now();
         
         const tickSeconds = 1;
         const collectMultiplier = tickSeconds / (24 * 60 * 60);
+        const dysonMultiplier = dysonSphereBuilt ? 2 : 1;
         
         let newResources = { ...resources };
         let changed = false;
+        
+        if (now - lastPriceUpdateTime > 30 * 1000) {
+          const newPrices = updatePrices(prices, now);
+          
+          const newPriceHistory = { ...priceHistory };
+          Object.keys(newPrices).forEach(resource => {
+            if (!newPriceHistory[resource]) newPriceHistory[resource] = [];
+            newPriceHistory[resource].push({
+              time: now,
+              price: newPrices[resource as keyof ResourcePrice]
+            });
+            if (newPriceHistory[resource].length > 50) {
+              newPriceHistory[resource] = newPriceHistory[resource].slice(-50);
+            }
+          });
+          
+          set({ 
+            prices: newPrices, 
+            lastPriceUpdateTime: now, 
+            priceHistory: newPriceHistory 
+          });
+        }
         
         const techMultiplier = techTree.filter(t => t.unlocked).length * 0.1 + 1;
         
@@ -325,6 +406,7 @@ export const useGameStore = create<GameState>()(
           
           let baseRate = aiTierSum * shipBonus * (1 + minerBonus);
           baseRate *= techMultiplier;
+          baseRate *= dysonMultiplier;
           
           const config = STAR_CONFIGS[star.type];
           let dailyRate = Math.floor(baseRate * 100);
@@ -347,6 +429,14 @@ export const useGameStore = create<GameState>()(
             
             if (star.remainingResources <= 0) {
               star.status = 'depleted';
+              star.dormantUntil = now + STAR_CONFIGS[star.type].dormantDays * 24 * 60 * 60 * 1000;
+            }
+            
+            if (star.status === 'depleted' && now > star.dormantUntil) {
+              star.status = 'active';
+              star.remainingResources = star.totalResources;
+              star.activeUntil = now + STAR_CONFIGS[star.type].activeDays * 24 * 60 * 60 * 1000;
+              star.dormantUntil = now + (STAR_CONFIGS[star.type].activeDays + STAR_CONFIGS[star.type].dormantDays) * 24 * 60 * 60 * 1000;
             }
           }
         });
@@ -362,12 +452,18 @@ export const useGameStore = create<GameState>()(
           const maintenanceCost = activeStars.reduce((sum, s) => sum + s.maintenanceFee * collectMultiplier, 0);
           const newStarcoins = player.starcoins - maintenanceCost + ironEarnings;
           
+          const resourceDelta = Object.values(newResources).reduce((sum, val) => sum + val, 0) - 
+                               Object.values(resources).reduce((sum, val) => sum + val, 0);
+          
           set({
             resources: newResources,
             stars: [...stars],
             player: { ...player, starcoins: Math.max(0, newStarcoins) },
-            lastOnlineTime: now
+            lastOnlineTime: now,
+            totalResourcesEarned: get().totalResourcesEarned + Math.max(0, resourceDelta)
           });
+          
+          get().checkAchievements();
         }
       },
 
@@ -797,6 +893,211 @@ export const useGameStore = create<GameState>()(
           });
         }
         get().saveGame();
+      },
+
+      upgradeAIWithGuarantee: (aiId: string) => {
+        const { player, ais, aiUpgradeFailStreak } = get();
+        const ai = ais.find(a => a.id === aiId);
+        
+        if (!ai || ai.tier >= 6) return;
+        
+        const cost = ai.tier * 1000;
+        if (player.starcoins < cost) {
+          alert('星币不足！');
+          return;
+        }
+        
+        let success = false;
+        const guaranteedSuccess = aiUpgradeFailStreak >= 5;
+        
+        if (guaranteedSuccess) {
+          success = true;
+        } else {
+          const successChance = 0.5 + aiUpgradeFailStreak * 0.1;
+          success = Math.random() < successChance;
+        }
+        
+        if (success) {
+          const newAIs = ais.map(a => 
+            a.id === aiId ? { ...a, tier: (a.tier + 1) as AI['tier'] } : a
+          );
+          
+          set({ 
+            ais: newAIs,
+            player: { ...player, starcoins: player.starcoins - cost },
+            aiUpgradeFailStreak: 0
+          });
+          
+          alert(`🎉 升级成功！AI 等级提升到 ${ai.tier + 1}`);
+        } else {
+          set({ 
+            player: { ...player, starcoins: player.starcoins - cost },
+            aiUpgradeFailStreak: aiUpgradeFailStreak + 1
+          });
+          
+          const attemptsLeft = 5 - aiUpgradeFailStreak - 1;
+          if (attemptsLeft > 0) {
+            alert(`💔 升级失败！再失败 ${attemptsLeft} 次后下一次必成功`);
+          } else {
+            alert(`💔 升级失败！下次必成功！`);
+          }
+        }
+        
+        get().saveGame();
+      },
+
+      buildDysonSphere: () => {
+        const { player, resources, stars } = get();
+        
+        const requiredResources = {
+          iron: 100000,
+          titanium: 50000,
+          crystal: 20000,
+          rareOre: 10000,
+          nano: 5000,
+          darkMatter: 1000,
+          antiMatter: 500,
+          exoticMatter: 100
+        };
+        
+        const canBuild = Object.entries(requiredResources).every(
+          ([resource, amount]) => resources[resource as keyof PlayerResources] >= amount
+        );
+        
+        if (!canBuild) {
+          alert('资源不足！无法建造戴森球');
+          return;
+        }
+        
+        if (player.starcoins < 1000000) {
+          alert('星币不足！需要 100 万星币');
+          return;
+        }
+        
+        if (stars.length < 3) {
+          alert('需要至少拥有 3 颗恒星才能建造戴森球');
+          return;
+        }
+        
+        const newResources = { ...resources };
+        Object.entries(requiredResources).forEach(([resource, amount]) => {
+          newResources[resource as keyof PlayerResources] -= amount;
+        });
+        
+        set({
+          resources: newResources,
+          player: { ...player, starcoins: player.starcoins - 1000000 },
+          dysonSphereBuilt: true
+        });
+        
+        get().saveGame();
+        alert('🎊 恭喜！戴森球建造成功！所有恒星产出翻倍！');
+      },
+
+      contributeToDysonSphere: (resourceType: keyof PlayerResources, amount: number) => {
+        const { resources, dysonSphereProgress } = get();
+        
+        if (resources[resourceType] < amount) {
+          alert('资源不足！');
+          return;
+        }
+        
+        const contributionValue = amount * (RESOURCE_PRICE_CONFIGS[resourceType]?.basePrice || 1);
+        const newProgress = Math.min(100, dysonSphereProgress + contributionValue / 1000);
+        
+        const newResources = { ...resources };
+        newResources[resourceType] -= amount;
+        
+        set({
+          resources: newResources,
+          dysonSphereProgress: newProgress
+        });
+        
+        get().saveGame();
+      },
+
+      checkAchievements: () => {
+        const { stars, ais, ships, techTree, dysonSphereBuilt, arenaMatches, totalResourcesEarned, achievements } = get();
+        let updated = false;
+        
+        const newAchievements = achievements.map(achievement => {
+          if (achievement.unlocked) return achievement;
+          
+          let unlocked = false;
+          switch (achievement.id) {
+            case 'firstStar':
+              unlocked = stars.length >= 1;
+              break;
+            case 'tenStars':
+              unlocked = stars.length >= 10;
+              break;
+            case 't5AI':
+              unlocked = ais.some(ai => ai.tier >= 5);
+              break;
+            case 'lv5Ship':
+              unlocked = ships.some(ship => ship.level >= 5);
+              break;
+            case 'millionaire':
+              unlocked = totalResourcesEarned >= 1000000;
+              break;
+            case 'arenaWinner':
+              unlocked = arenaMatches.filter(m => m.result === 'player1').length >= 10;
+              break;
+            case 'dysonSphere':
+              unlocked = dysonSphereBuilt;
+              break;
+            case 'techMaster':
+              unlocked = techTree.every(t => t.unlocked);
+              break;
+          }
+          
+          if (unlocked && !achievement.unlocked) {
+            updated = true;
+            return { ...achievement, unlocked: true };
+          }
+          
+          return achievement;
+        });
+        
+        if (updated) {
+          set({ achievements: newAchievements });
+        }
+      },
+
+      claimAchievement: (achievementId: string) => {
+        const { achievements, player, resources } = get();
+        const achievement = achievements.find(a => a.id === achievementId);
+        
+        if (!achievement || !achievement.unlocked || achievement.claimed) {
+          return;
+        }
+        
+        let updatedPlayer = { ...player };
+        let updatedResources = { ...resources };
+        
+        switch (achievement.rewardType) {
+          case 'starcoins':
+            updatedPlayer.starcoins += achievement.rewardAmount;
+            break;
+          case 'resource':
+            if (achievement.rewardResource) {
+              updatedResources[achievement.rewardResource] += achievement.rewardAmount;
+            }
+            break;
+        }
+        
+        const newAchievements = achievements.map(a => 
+          a.id === achievementId ? { ...a, claimed: true } : a
+        );
+        
+        set({
+          achievements: newAchievements,
+          player: updatedPlayer,
+          resources: updatedResources
+        });
+        
+        get().saveGame();
+        alert(`🎉 成就领取成功！获得 ${achievement.rewardType === 'starcoins' ? achievement.rewardAmount + ' 星币' : '奖励'}`);
       }
     }),
     {
@@ -813,7 +1114,14 @@ export const useGameStore = create<GameState>()(
         prices: state.prices,
         techTree: state.techTree,
         lastCollectTime: state.lastCollectTime,
-        lastSaveTime: Date.now()
+        lastSaveTime: Date.now(),
+        lastPriceUpdateTime: state.lastPriceUpdateTime,
+        priceHistory: state.priceHistory,
+        aiUpgradeFailStreak: state.aiUpgradeFailStreak,
+        dysonSphereBuilt: state.dysonSphereBuilt,
+        dysonSphereProgress: state.dysonSphereProgress,
+        achievements: state.achievements,
+        totalResourcesEarned: state.totalResourcesEarned
       })
     }
   )

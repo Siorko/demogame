@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Store, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
+import { RESOURCE_PRICE_CONFIGS } from '../types/game';
 
 const resourceInfo = [
   { key: 'iron', name: '铁矿', icon: '⛏️', color: '#94A3B8' },
@@ -14,8 +15,22 @@ const resourceInfo = [
 ];
 
 export default function MarketPage() {
-  const { resources, prices, sellResource } = useGameStore();
+  const { resources, prices, sellResource, priceHistory } = useGameStore();
   const [sellAmounts, setSellAmounts] = useState<Record<string, number>>({});
+
+  const getPriceTrend = (resourceKey: string) => {
+    const history = priceHistory[resourceKey] || [];
+    if (history.length < 2) return { trend: 'flat', change: 0 };
+    
+    const currentPrice = prices[resourceKey as keyof typeof prices];
+    const previousPrice = history[history.length - 2]?.price || currentPrice;
+    
+    const change = ((currentPrice - previousPrice) / previousPrice) * 100;
+    
+    if (change > 0.5) return { trend: 'up', change };
+    if (change < -0.5) return { trend: 'down', change };
+    return { trend: 'flat', change };
+  };
 
   const handleSell = (resourceKey: string) => {
     const amount = sellAmounts[resourceKey] || 0;
@@ -38,25 +53,52 @@ export default function MarketPage() {
           </div>
           <div>
             <h1 className="text-white font-bold text-xl">售货区</h1>
-            <p className="text-gray-400 text-sm">出售矿石获取星币</p>
+            <p className="text-gray-400 text-sm">出售矿石获取星币 · 价格每30秒波动</p>
           </div>
         </div>
 
         <div className="bg-[#16213e]/50 rounded-2xl p-4 mb-6 border border-[#0f3460]">
           <h2 className="text-white font-medium mb-3 flex items-center gap-2">
             <TrendingUp className="text-green-400" size={18} />
-            当前价格
+            当前市场行情
           </h2>
-          <div className="grid grid-cols-4 gap-2">
-            {resourceInfo.map(resource => (
-              <div key={resource.key} className="bg-[#0f3460]/50 rounded-xl p-2 text-center">
-                <span className="text-2xl">{resource.icon}</span>
-                <p className="text-gray-400 text-xs mt-1">{resource.name}</p>
-                <p className="text-white text-sm font-mono">
-                  {prices[resource.key as keyof typeof prices]}星币
-                </p>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {resourceInfo.map(resource => {
+              const { trend, change } = getPriceTrend(resource.key);
+              const currentPrice = prices[resource.key as keyof typeof prices];
+              const config = RESOURCE_PRICE_CONFIGS[resource.key];
+              
+              return (
+                <div 
+                  key={resource.key} 
+                  className="bg-[#0f3460]/50 rounded-xl p-3 text-center border border-transparent hover:border-[#4ECDC4]/30 transition-all"
+                >
+                  <span className="text-2xl">{resource.icon}</span>
+                  <p className="text-gray-400 text-xs mt-1">{resource.name}</p>
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    {trend === 'up' && <TrendingUp className="text-green-400" size={14} />}
+                    {trend === 'down' && <TrendingDown className="text-red-400" size={14} />}
+                    {trend === 'flat' && <Minus className="text-gray-400" size={14} />}
+                    <p className={`text-sm font-mono ${
+                      trend === 'up' ? 'text-green-400' : 
+                      trend === 'down' ? 'text-red-400' : 'text-white'
+                    }`}>
+                      {currentPrice}星币
+                    </p>
+                  </div>
+                  {change !== 0 && (
+                    <p className={`text-xs mt-1 ${
+                      trend === 'up' ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {trend === 'up' ? '+' : ''}{change.toFixed(1)}%
+                    </p>
+                  )}
+                  <p className="text-gray-500 text-xs mt-1">
+                    区间: {config.minMultiplier}x - {config.maxMultiplier}x
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -67,11 +109,16 @@ export default function MarketPage() {
             const amount = resources[resource.key as keyof typeof resources];
             const sellAmount = sellAmounts[resource.key] || 0;
             const totalValue = Math.floor(amount * prices[resource.key as keyof typeof prices]);
+            const { trend } = getPriceTrend(resource.key);
             
             return (
               <div
                 key={resource.key}
-                className="bg-[#16213e]/50 rounded-xl p-4 border border-[#0f3460] hover:border-[#4ECDC4]/30 transition-all"
+                className={`bg-[#16213e]/50 rounded-xl p-4 border transition-all ${
+                  trend === 'up' ? 'border-green-500/30' :
+                  trend === 'down' ? 'border-red-500/30' :
+                  'border-[#0f3460]'
+                } hover:border-[#4ECDC4]/50`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -83,7 +130,14 @@ export default function MarketPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-white font-mono">{totalValue.toLocaleString()} 星币</p>
-                    <p className="text-gray-400 text-xs">单价: {prices[resource.key as keyof typeof prices]}</p>
+                    <p className={`text-xs ${
+                      trend === 'up' ? 'text-green-400' : 
+                      trend === 'down' ? 'text-red-400' : 'text-gray-400'
+                    }`}>
+                      单价: {prices[resource.key as keyof typeof prices]}
+                      {trend === 'up' && ' ↑'}
+                      {trend === 'down' && ' ↓'}
+                    </p>
                   </div>
                 </div>
                 
@@ -118,14 +172,14 @@ export default function MarketPage() {
           })}
         </div>
 
-        <div className="mt-6 bg-gradient-to-r from-[#FF6B6B]/20 to-[#FFE66D]/20 rounded-xl p-4 border border-[#FF6B6B]/30">
+        <div className="mt-6 bg-gradient-to-r from-[#FFE66D]/10 to-[#4ECDC4]/10 rounded-xl p-4 border border-[#4ECDC4]/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#FF6B6B]/30 rounded-lg">
-              <TrendingDown className="text-[#FF6B6B]" size={20} />
+            <div className="p-2 bg-[#4ECDC4]/20 rounded-lg">
+              <TrendingUp className="text-[#4ECDC4]" size={20} />
             </div>
             <div>
-              <h3 className="text-white font-medium">价格波动提醒</h3>
-              <p className="text-gray-400 text-sm">市场价格每小时波动一次，把握最佳出售时机！</p>
+              <h3 className="text-white font-medium">市场动态</h3>
+              <p className="text-gray-400 text-sm">价格每30秒自动波动，在价格高点出售可获得更多星币！</p>
             </div>
           </div>
         </div>
